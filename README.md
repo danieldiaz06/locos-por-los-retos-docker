@@ -104,8 +104,44 @@ docker logs firewall
 docker run --rm --network red1_mynetwork alpine sh -c "ping -c2 172.25.0.2; ping -c2 172.25.0.4; wget -qO- 172.25.0.2; wget -qO- 172.25.0.3; ping -c2 host.docker.internal"
 ```
 
-<!-- 📸 PEGAR AQUÍ: captura de docker logs firewall (reglas iptables) -->
-<!-- 📸 PEGAR AQUÍ: captura de los pings y del "Server 1" / "Server 2" -->
+Reglas aplicadas por el firewall (`docker logs firewall`): se acepta todo lo que viene de 172.25.0.0/16 y se descarta el resto.
+
+```
+Chain INPUT (policy ACCEPT)
+target     prot opt source               destination
+ACCEPT     all  --  172.25.0.0/16        0.0.0.0/0
+DROP       all  --  0.0.0.0/0            0.0.0.0/0
+
+Chain FORWARD (policy ACCEPT)
+target     prot opt source               destination
+
+Chain OUTPUT (policy ACCEPT)
+target     prot opt source               destination
+```
+
+Conectividad con web1 y el firewall, contenido de cada servidor web y acceso al host:
+
+```
+PING 172.25.0.2 (172.25.0.2): 56 data bytes
+64 bytes from 172.25.0.2: seq=0 ttl=64 time=0.378 ms
+64 bytes from 172.25.0.2: seq=1 ttl=64 time=0.081 ms
+2 packets transmitted, 2 packets received, 0% packet loss
+
+PING 172.25.0.4 (172.25.0.4): 56 data bytes
+64 bytes from 172.25.0.4: seq=0 ttl=64 time=0.260 ms
+64 bytes from 172.25.0.4: seq=1 ttl=64 time=0.081 ms
+2 packets transmitted, 2 packets received, 0% packet loss
+
+<h1>Server 1</h1>
+<h1>Server 2</h1>
+
+PING host.docker.internal (192.168.65.254): 56 data bytes
+64 bytes from 192.168.65.254: seq=0 ttl=63 time=13.801 ms
+64 bytes from 192.168.65.254: seq=1 ttl=63 time=0.700 ms
+2 packets transmitted, 2 packets received, 0% packet loss
+```
+
+Todos los contenedores se alcanzan entre sí, cada web sirve su propia página y el host responde. El TTL 63 indica que hay un salto de router (el gateway de Docker Desktop).
 
 ---
 
@@ -204,7 +240,48 @@ Todos se ejecutan dentro del contenedor Parrot.
 
 **8. Escaneo avanzado**: `nmap -sS -sV -O -T4 172.25.0.0/24` (SYN sigiloso + versiones + SO + velocidad alta).
 
-<!-- 📸 PEGAR AQUÍ: captura de nmap -sS -sV -O -T4 172.25.0.0/24 -->
+Resultado (se omiten los bloques `TCP/IP fingerprint` de cada host por longitud):
+
+```
+Starting Nmap 7.95 ( https://nmap.org ) at 2026-11-16 20:13 UTC
+Nmap scan report for 172.25.0.1
+Host is up (0.00014s latency).
+Not shown: 995 closed tcp ports (reset)
+PORT      STATE SERVICE VERSION
+111/tcp   open  rpcbind 2-4 (RPC #100000)
+8080/tcp  open  http    Apache httpd 2.4.69 ((Debian))
+8081/tcp  open  http    Apache httpd 2.4.69 ((Unix))
+8082/tcp  open  http    Apache httpd 2.4.71 ((Unix))
+32768/tcp open  mysqlx  MySQL X protocol listener
+Network Distance: 1 hop
+
+Nmap scan report for web1.red1_mynetwork (172.25.0.2)
+PORT   STATE SERVICE VERSION
+80/tcp open  http    Apache httpd 2.4.69 ((Debian))
+Network Distance: 1 hop
+
+Nmap scan report for web2.red1_mynetwork (172.25.0.3)
+PORT   STATE SERVICE VERSION
+80/tcp open  http    Apache httpd 2.4.71 ((Unix))
+Network Distance: 1 hop
+
+Nmap scan report for firewall.red1_mynetwork (172.25.0.4)
+All 1000 scanned ports on firewall.red1_mynetwork (172.25.0.4) are in ignored states.
+Too many fingerprints match this host to give specific OS details
+
+Nmap scan report for 94c445bfa1e3 (172.25.0.5)
+All 1000 scanned ports on 94c445bfa1e3 (172.25.0.5) are in ignored states.
+Network Distance: 0 hops
+
+OS and Service detection performed.
+Nmap done: 256 IP addresses (5 hosts up) scanned in 21.22 seconds
+```
+
+Conclusiones del escaneo:
+- **web1** ya ejecuta Apache 2.4.69 sobre **Debian** (imagen `php:8.2-apache` del paso 7) y **web2** Apache 2.4.71 compilado (**Unix**, imagen `httpd`).
+- En el **gateway** (172.25.0.1) aparecen los puertos publicados en el host: 8080 (web1), 8082 (web2), 8081 (otra práctica) y servicios de la VM de Docker.
+- El **firewall** y **Parrot** no exponen ningún servicio.
+- `nmap -O` no identifica una versión exacta del sistema: los contenedores comparten el kernel de la VM de Docker, pero el fingerprint corresponde a **Linux x86_64**.
 
 **9. Scripts NSE de vulnerabilidades SMB**: `nmap --script "smb-vuln*" 172.25.0.2`. Sin resultados, porque web1 no tiene SMB (puerto 445). Es el resultado esperado.
 
@@ -329,7 +406,7 @@ docker push daiaz/parrotsec:latest
 
 ![docker push](img/Pasted%20image%2020261116205712.png)
 
-<!-- 📸 PEGAR AQUÍ: push de parrotsec terminado y perfil de hub.docker.com/u/daiaz con los 4 repositorios -->
+Imágenes publicadas en https://hub.docker.com/u/daiaz: `web1`, `web2`, `firewall` y `parrotsec`. La de Parrot es la más pesada (unos 6 GB comprimida, 20 GB en disco) por todas las herramientas de pentesting que incluye.
 
 Docker Hub no guarda el `docker-compose.yml`, así que el proyecto se sube a GitHub:
 
