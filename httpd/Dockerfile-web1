@@ -1,0 +1,5 @@
+# Dockerfile para web1: Apache + PHP
+# La imagen httpd no trae PHP, así que usamos la oficial php:apache
+# (Apache con el módulo de PHP ya instalado y configurado)
+FROM php:8.2-apache
+COPY ./public-html/ /var/www/html/

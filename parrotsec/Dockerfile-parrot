@@ -1,0 +1,28 @@
+# Usar la imagen oficial de Parrot Security OS
+FROM parrotsec/security:latest
+
+# Evitar preguntas interactivas durante la instalación (wireshark pregunta)
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Actualizar e instalar herramientas
+RUN apt-get update && apt-get install -y \
+    metasploit-framework \
+    nmap \
+    burpsuite \
+    wireshark \
+    tshark \
+    john \
+    hydra \
+    git \
+    vim \
+    wget \
+    curl \
+    iputils-ping \
+    iproute2 \
+    && apt-get clean
+
+# Directorio de trabajo
+WORKDIR /root
+
+# Mantener una shell abierta
+CMD ["bash"]
